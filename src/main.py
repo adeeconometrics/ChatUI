@@ -1,5 +1,6 @@
 from typing import Any
 from time import sleep
+from os import path
 import json
 import requests
 from urllib.error import HTTPError
@@ -9,27 +10,38 @@ import streamlit as st
 
 def chat_ui() -> None:
     st.title("Mr. Frank for CodeAssist")
-    st.write("Welcome to the chat! I'm Mr. Frank, ask away!")
 
-    user_input = st.text_input("User Input")
+    # script_dir = path.dirname(__file__)
+    # fin_path = path.join(script_dir, "../img/FinFruit.jpg")
+    # frank_path = path.join(script_dir, "../img/FrankFruit.jpg")
+    # fin_abs_path = path.join(script_dir, fin_path)
+    # frank_abs_path = path.join(script_dir, frank_path)
 
-    headers =  {
-        'Content-Type': 'application/json',
-    }
+    # input_col, output_col = st.columns(2)
+    # input_col.markdown(frank_abs_path)
+    # user_input = input_col.text_input("Input")
 
-    data = {
-        'model': "gemma:2b",
-        'stream': False,
-        'prompt': user_input,
-    }
+    # output_col.image(fin_abs_path)
+    # placeholder = output_col.empty()
 
-    # Send button
-    if st.button("Send"):
-        # response = process_input("http://localhost:11434/api/generate",user_input)
-        api_response  = requests.post('http://localhost:11434/api/generate', headers=headers, data=json.dumps(data))
+    user_input = st.chat_input("I'm Mr. Frank, how can I help you today?")
+    if user_input:
+        st.write("User: ", user_input)
+
+        headers =  {
+            'Content-Type': 'application/json',
+        }
+
+        data = {
+            'model': "gemma:2b",
+            'stream': False,
+            'prompt': user_input,
+        }
+
+        api_response = requests.post(
+            'http://localhost:11434/api/generate', headers=headers, data=json.dumps(data))
 
         placeholder = st.empty()
-
 
         try:
             # response_text = api_response.text
@@ -37,19 +49,12 @@ def chat_ui() -> None:
             for line in api_response.iter_lines():
                 if line:
                     response = json.loads(line)["response"]
-                        
+
                 for i in range(len(response)):
-                    placeholder.markdown("LLama: "+ response[:i+1])
+                    placeholder.markdown("Mr. Frank: " + response[:i+1])
                     sleep(.025)
-            # st.write("LLama: ", response)
         except HTTPError as http_err:
             print(f'HTTP error occurred: {http_err}')
-
-def process_input(api_url:str, input:Any) -> str:
-    # Add your logic to process user input and generate response
-    # For example, you can use a chatbot library or write your own logic here
-
-    return "This is a sample response"
 
 if __name__ == '__main__':
     chat_ui()
