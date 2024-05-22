@@ -28,12 +28,12 @@ def chat_ui() -> None:
     if user_input:
         st.write("User: ", user_input)
 
-        headers =  {
+        headers = {
             'Content-Type': 'application/json',
         }
 
         data = {
-            'model': "gemma:2b",
+            'model': "llama3",
             'stream': False,
             'prompt': user_input,
         }
@@ -51,10 +51,11 @@ def chat_ui() -> None:
                     response = json.loads(line)["response"]
 
                 for i in range(len(response)):
-                    placeholder.markdown("Mr. Frank: " + response[:i+1])
+                    placeholder.markdown("Mr. Frank: \n" + response[:i+1])
                     sleep(.025)
         except HTTPError as http_err:
             print(f'HTTP error occurred: {http_err}')
+
 
 if __name__ == '__main__':
     chat_ui()
