@@ -1,12 +1,57 @@
+from base64 import b64encode
+from pathlib import Path
+from uuid import UUID
+
+from langchain_core.outputs import LLMResult
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-# from langchain.callbacks.manager import CallBackManager
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain.llms import Ollama
+from langchain_community.llms import Ollama
+from langchain.callbacks.base import BaseCallbackHandler
 
-def get_response(user_query, chat_history):
+
+class StreamingChatCallbackHandler(BaseCallbackHandler):
+    def __init__(self, t_name:str, t_imgb64:str) -> None:
+        self.t_name = t_name
+        self.t_imgb64 = t_imgb64
+    
+    def on_llm_start(self, *args, **kwargs) -> None:
+        self.container = st.empty()
+        self.text = ""
+
+    # def on_llm_end(self, response: LLMResult, **kwargs: Ollama):
+    #     print(f"llm ended with response")
+    #     st.session_state.chat_history.append(AIMessage(response))
+
+    def on_llm_new_token(self, token:str, *args, **kwargs) -> None:
+        self.text += token
+        self.container.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                <img src="data:image/png;base64,{self.t_imgb64}" alt="{self.t_name}" style="width: 32px; height: 32px; border-radius: 50%; margin-right: 1rem;">
+                <div>
+                    <strong>{self.t_name}</strong>
+                    <p>{self.text}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+def chat_message(name:str, message:str, avatar_path:Path):
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+        <img src="data:image/png;base64,{avatar_path}" alt="{name}" style="width: 32px; height: 32px; border-radius: 50%; margin-right: 1rem;">
+        <div>
+            <strong>{name}</strong>
+            <p>{message}</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def image_to_base64(image_path:Path):
+    with open(image_path, "rb") as img_file:
+        return b64encode(img_file.read()).decode()
+
+def get_response(user_query, chat_history, t_name, t_imgb64) -> str:
     template = """
     You are a helpful assistant named Mr. Frank. You are here to help me with my code. Answer the following questions considering the chat history.
 
@@ -17,7 +62,7 @@ def get_response(user_query, chat_history):
     prompt = ChatPromptTemplate.from_template(template=template)
 
     llm = Ollama(
-        model = 'gemma:2b',
+        model = 'codegemma:2b', callbacks=[StreamingChatCallbackHandler(t_name, t_imgb64)]
     )
     
     chain = prompt | llm | StrOutputParser()
@@ -27,6 +72,9 @@ def get_response(user_query, chat_history):
     })
 
 if __name__ == "__main__":
+    user_avatar = image_to_base64("img/CreamFruitMono.ico")
+    ai_avatar = image_to_base64("img/FrankFruitMono.ico")
+    
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = [
             AIMessage("Hello, I'm Mr. Frank, how can I help you today?")
@@ -34,20 +82,15 @@ if __name__ == "__main__":
 
     for message in st.session_state.chat_history:
         if isinstance(message, AIMessage):
-            with st.chat_message('AI', avatar=st.image('img/FrankFruit.ico')):
-                st.write(message.content)
+            chat_message('Mr. Frank', message.content, avatar_path=ai_avatar)
         elif isinstance(message, HumanMessage):
-            with st.chat_message('Human', avatar=st.image('img/CreamFruit.ico')):
-                st.write(message.content)
+            chat_message('User: ', message.content, avatar_path=user_avatar)
 
     user_input = st.chat_input("I'm Mr. Frank, how can I help you today?")
     if user_input is not None and user_input != '':
         st.session_state.chat_history.append(HumanMessage(user_input))
-        
-        with st.chat_message("Human", avatar=st.image('img/CreamFruit.ico')):
-            st.markdown(f"User: {user_input}")
-        with st.chat_message('AI', avatar=st.image('img/FrankFruit.ico')):
-            response = get_response(user_input, st.session_state.chat_history)
-            st.markdown(f"Mr. Frank: \n{response}")
 
+        chat_message('User: ', user_input, avatar_path=user_avatar)
+        
+        response = get_response(user_input, st.session_state.chat_history, "Mr. Frank", ai_avatar)
         st.session_state.chat_history.append(AIMessage(response))
